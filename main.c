@@ -1,6 +1,5 @@
 /*** includes ***/
 
-#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,7 +61,10 @@ char editorReadKey(void) {
 
 /*** output ***/
 
-void editorRefreshScreen(void) { write(STDOUT_FILENO, "\x1b[2J", 4); }
+void editorRefreshScreen(void) {
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDOUT_FILENO, "\x1b[H", 3);
+}
 
 /*** input ***/
 
