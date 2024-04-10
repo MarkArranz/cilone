@@ -40,6 +40,7 @@ typedef struct erow {
 
 struct editorConfig {
   int cx, cy;
+  int rowoff;
   int screenrows;
   int screencols;
   int numrows;
@@ -230,10 +231,22 @@ void abFree(struct abuf *ab) { free(ab->b); }
 
 /*** output ***/
 
+void editorScroll(void) {
+  // Is the cursor above the phsical window?
+  if (E.cy < E.rowoff) {
+    E.rowoff = E.cy;
+  }
+  // Is the cursor past the b ottom of the visible window?
+  if (E.cy >= E.rowoff + E.screenrows) {
+    E.rowoff = E.cy - E.screenrows + 1;
+  }
+}
+
 void editorDrawRows(struct abuf *ab) {
   for (int y = 0; y < E.screenrows; y++) {
+    int filerow = y + E.rowoff;
     // Are we drawing a row that comes after the text buffer?:
-    if (y >= E.numrows) {
+    if (filerow >= E.numrows) {
       // Should we draw the welcome message?:
       if (E.numrows == 0 && y == E.screenrows / 3) {
         char welcome[80];
@@ -252,10 +265,10 @@ void editorDrawRows(struct abuf *ab) {
         abAppend(ab, "~", 1);
       }
     } else {
-      int len = E.row[y].size;
+      int len = E.row[filerow].size;
       // Truncate the text buffer if it is larger than the screen width:
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, E.row[y].chars, len);
+      abAppend(ab, E.row[filerow].chars, len);
     }
 
     // Clear the rest of the line.
@@ -265,6 +278,8 @@ void editorDrawRows(struct abuf *ab) {
 }
 
 void editorRefreshScreen(void) {
+  editorScroll();
+
   struct abuf ab = ABUF_INIT;
 
   abAppend(&ab, "\x1b[?25h", 6);
@@ -273,7 +288,7 @@ void editorRefreshScreen(void) {
   editorDrawRows(&ab);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
   abAppend(&ab, buf, strlen(buf));
 
   abAppend(&ab, "\x1b[?25h", 6);
@@ -296,7 +311,7 @@ void editorMoveCursor(int key) {
       if (E.cy != 0) E.cy--;
       break;
     case ARROW_DOWN:
-      if (E.cy != E.screenrows - 1) E.cy++;
+      if (E.cy < E.numrows) E.cy++;
       break;
   }
 }
@@ -339,6 +354,7 @@ void editorProcessKeypress(void) {
 void initEditor(void) {
   E.cx = 0;
   E.cy = 0;
+  E.rowoff = 0;
   E.numrows = 0;
   E.row = NULL;
 
