@@ -41,6 +41,7 @@ typedef struct erow {
 struct editorConfig {
   int cx, cy;
   int rowoff;
+  int coloff;
   int screenrows;
   int screencols;
   int numrows;
@@ -236,9 +237,17 @@ void editorScroll(void) {
   if (E.cy < E.rowoff) {
     E.rowoff = E.cy;
   }
-  // Is the cursor past the b ottom of the visible window?
+  // Is the cursor below the phsical window?
   if (E.cy >= E.rowoff + E.screenrows) {
     E.rowoff = E.cy - E.screenrows + 1;
+  }
+  // Is the cursor to the left of the phsical window?
+  if (E.cx < E.coloff) {
+    E.coloff = E.cx;
+  }
+  // Is the cursor to the right of the phsical window?
+  if (E.cx >= E.coloff + E.screencols) {
+    E.coloff = E.cx - E.screencols + 1;
   }
 }
 
@@ -265,10 +274,11 @@ void editorDrawRows(struct abuf *ab) {
         abAppend(ab, "~", 1);
       }
     } else {
-      int len = E.row[filerow].size;
+      int len = E.row[filerow].size - E.coloff;
+      if (len < 0) len = 0;
       // Truncate the text buffer if it is larger than the screen width:
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, E.row[filerow].chars, len);
+      abAppend(ab, &E.row[filerow].chars[E.coloff], len);
     }
 
     // Clear the rest of the line.
@@ -288,7 +298,8 @@ void editorRefreshScreen(void) {
   editorDrawRows(&ab);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
+           (E.cx - E.coloff) + 1);
   abAppend(&ab, buf, strlen(buf));
 
   abAppend(&ab, "\x1b[?25h", 6);
@@ -305,7 +316,7 @@ void editorMoveCursor(int key) {
       if (E.cx != 0) E.cx--;
       break;
     case ARROW_RIGHT:
-      if (E.cx != E.screencols - 1) E.cx++;
+      E.cx++;
       break;
     case ARROW_UP:
       if (E.cy != 0) E.cy--;
@@ -355,6 +366,7 @@ void initEditor(void) {
   E.cx = 0;
   E.cy = 0;
   E.rowoff = 0;
+  E.coloff = 0;
   E.numrows = 0;
   E.row = NULL;
 
