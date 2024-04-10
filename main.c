@@ -16,6 +16,7 @@
 /*** defines ***/
 
 #define KILO_VERSION "0.0.1"
+#define KILO_TAB_STOP 8
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
@@ -35,11 +36,14 @@ enum editorKey {
 
 typedef struct erow {
   int size;
+  int rsize;
   char *chars;
+  char *render;
 } erow;
 
 struct editorConfig {
   int cx, cy;
+  int rx;
   int rowoff;
   int coloff;
   int screenrows;
@@ -178,6 +182,43 @@ int getWindowSize(int *rows, int *cols) {
   }
 }
 
+/*** row operations ***/
+
+int editorRowCxToRx(erow *row, int cx) {
+  int rx = 0;
+  for (int j = 0; j < cx; j++) {
+    if (row->chars[j] == '\t') {
+      rx += (KILO_TAB_STOP - 1) - (rx & KILO_TAB_STOP);
+    }
+    rx++;
+  }
+  return rx;
+}
+
+void editorUpdateRow(erow *row) {
+  int tabs = 0;
+  int c;  // character index
+  for (c = 0; c < row->size; c++) {
+    if (row->chars[c] == '\t') tabs++;
+  }
+
+  free(row->render);
+  row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1);
+
+  int r = 0;  // render index
+  for (c = 0; c < row->size; c++) {
+    if (row->chars[c] == '\t') {
+      do {
+        row->render[r++] = ' ';
+      } while (r % KILO_TAB_STOP != 0);
+    } else {
+      row->render[r++] = row->chars[c];
+    }
+  }
+  row->render[r] = '\0';
+  row->rsize = r;
+}
+
 void editorAppendRow(char *s, size_t len) {
   E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
 
@@ -186,6 +227,11 @@ void editorAppendRow(char *s, size_t len) {
   E.row[at].chars = malloc(len + 1);
   memcpy(E.row[at].chars, s, len);
   E.row[at].chars[len] = '\0';
+
+  E.row[at].rsize = 0;
+  E.row[at].render = NULL;
+  editorUpdateRow(&E.row[at]);
+
   E.numrows++;
 }
 
@@ -233,6 +279,11 @@ void abFree(struct abuf *ab) { free(ab->b); }
 /*** output ***/
 
 void editorScroll(void) {
+  E.rx = 0;
+  if (E.cy < E.numrows) {
+    E.rx = editorRowCxToRx(&E.row[E.cy], E.cx);
+  }
+
   // Is the cursor above the phsical window?
   if (E.cy < E.rowoff) {
     E.rowoff = E.cy;
@@ -241,13 +292,13 @@ void editorScroll(void) {
   if (E.cy >= E.rowoff + E.screenrows) {
     E.rowoff = E.cy - E.screenrows + 1;
   }
-  // Is the cursor to the left of the phsical window?
-  if (E.cx < E.coloff) {
-    E.coloff = E.cx;
+  // Is the rendered cursor to the left of the phsical window?
+  if (E.rx < E.coloff) {
+    E.coloff = E.rx;
   }
-  // Is the cursor to the right of the phsical window?
-  if (E.cx >= E.coloff + E.screencols) {
-    E.coloff = E.cx - E.screencols + 1;
+  // Is the rendered cursor to the right of the phsical window?
+  if (E.rx >= E.coloff + E.screencols) {
+    E.coloff = E.rx - E.screencols + 1;
   }
 }
 
@@ -274,11 +325,11 @@ void editorDrawRows(struct abuf *ab) {
         abAppend(ab, "~", 1);
       }
     } else {
-      int len = E.row[filerow].size - E.coloff;
+      int len = E.row[filerow].rsize - E.coloff;
       if (len < 0) len = 0;
       // Truncate the text buffer if it is larger than the screen width:
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, &E.row[filerow].chars[E.coloff], len);
+      abAppend(ab, &E.row[filerow].render[E.coloff], len);
     }
 
     // Clear the rest of the line.
@@ -298,8 +349,12 @@ void editorRefreshScreen(void) {
   editorDrawRows(&ab);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
-           (E.cx - E.coloff) + 1);
+  // clang-format off
+  snprintf(buf, sizeof(buf),
+           "\x1b[%d;%dH",
+           (E.cy - E.rowoff) + 1,
+           (E.rx - E.coloff) + 1);
+  // clang-format on
   abAppend(&ab, buf, strlen(buf));
 
   abAppend(&ab, "\x1b[?25h", 6);
@@ -383,6 +438,7 @@ void editorProcessKeypress(void) {
 void initEditor(void) {
   E.cx = 0;
   E.cy = 0;
+  E.rx = 0;
   E.rowoff = 0;
   E.coloff = 0;
   E.numrows = 0;
