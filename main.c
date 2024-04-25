@@ -19,9 +19,9 @@
 
 /*** defines ***/
 
-#define KILO_VERSION "0.0.1"
-#define KILO_TAB_STOP 8
-#define KILO_QUIT_TIMES 3
+#define KILONE_VERSION "0.0.1"
+#define KILONE_TAB_STOP 8
+#define KILONE_QUIT_TIMES 3
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
@@ -229,7 +229,7 @@ int editorRowCxToRx(erow *row, int cx) {
   int rx = 0;
   for (int j = 0; j < cx; j++) {
     if (row->chars[j] == '\t') {
-      rx += (KILO_TAB_STOP - 1) - (rx & KILO_TAB_STOP);
+      rx += (KILONE_TAB_STOP - 1) - (rx & KILONE_TAB_STOP);
     }
     rx++;
   }
@@ -241,7 +241,7 @@ int editorRowRxToCx(erow *row, int rx) {
   int cx;
   for (cx = 0; cx < row->size; cx++) {
     if (row->chars[cx] == '\t') {
-      cur_rx += (KILO_TAB_STOP - 1) - (cur_rx & KILO_TAB_STOP);
+      cur_rx += (KILONE_TAB_STOP - 1) - (cur_rx & KILONE_TAB_STOP);
     }
     cur_rx++;
 
@@ -261,14 +261,14 @@ void editorUpdateRow(erow *row) {
   }
 
   free(row->render);
-  row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1);
+  row->render = malloc(row->size + tabs * (KILONE_TAB_STOP - 1) + 1);
 
   int r = 0;  // render index
   for (c = 0; c < row->size; c++) {
     if (row->chars[c] == '\t') {
       do {
         row->render[r++] = ' ';
-      } while (r % KILO_TAB_STOP != 0);
+      } while (r % KILONE_TAB_STOP != 0);
     } else {
       row->render[r++] = row->chars[c];
     }
@@ -584,8 +584,9 @@ void editorDrawRows(struct abuf *ab) {
       // Should we draw the welcome message?:
       if (E.numrows == 0 && y == E.screenrows / 3) {
         char welcome[80];
-        int welcomelen = snprintf(welcome, sizeof(welcome),
-                                  "Kilo editor -- version %s", KILO_VERSION);
+        int welcomelen =
+            snprintf(welcome, sizeof(welcome), "Kilone editor -- version %s",
+                     KILONE_VERSION);
         if (welcomelen > E.screencols) {
           welcomelen = E.screencols;
         }
@@ -783,7 +784,7 @@ void editorMoveCursor(int key) {
 }
 
 void editorProcessKeypress(void) {
-  static int quit_times = KILO_QUIT_TIMES;
+  static int quit_times = KILONE_QUIT_TIMES;
   int c = editorReadKey();
 
   switch (c) {
@@ -866,7 +867,7 @@ void editorProcessKeypress(void) {
       break;
   }
 
-  quit_times = KILO_QUIT_TIMES;
+  quit_times = KILONE_QUIT_TIMES;
 }
 
 /*** init ***/
