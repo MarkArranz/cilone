@@ -1,2 +1,2 @@
-cilone: main.c
-	$(CC) main.c -o cilone.out -Wall -Wextra -pedantic -std=c99
+kilone: main.c
+	$(CC) main.c -o kilone.out -Wall -Wextra -pedantic -std=c99
